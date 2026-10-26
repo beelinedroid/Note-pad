@@ -1,0 +1,608 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Plain Notes</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: two panes. Left: search, month calendar, note list. Right: a quiet editor with a thin toolbar. One pane at a time on phones. */
+:root{
+  --bg:#ffffff;
+  --side:#f5f6f7;
+  --fg:#16181a;
+  --muted:#6a6f76;
+  --line:#e2e4e7;
+  --soft:#eceef0;
+  --inv:#16181a;
+  --on-inv:#ffffff;
+  --ui:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,monospace;
+  --gl:max(16px,env(safe-area-inset-left,0px));
+  --gr:max(16px,env(safe-area-inset-right,0px));
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#131415;--side:#1a1b1d;--fg:#ececee;--muted:#8e9299;--line:#2b2d30;--soft:#232528;--inv:#ececee;--on-inv:#131415;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#131415;--side:#1a1b1d;--fg:#ececee;--muted:#8e9299;--line:#2b2d30;--soft:#232528;--inv:#ececee;--on-inv:#131415;
+  color-scheme:dark;
+}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.5 var(--ui);-webkit-text-size-adjust:100%}
+button,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--fg);outline-offset:1px}
+
+.app{height:100%;display:grid;grid-template-columns:minmax(260px,320px) minmax(0,1fr)}
+
+/* sidebar */
+.side{background:var(--side);border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0;min-width:0;overflow:hidden;padding-inline:var(--gl) var(--gr)}
+.side-top{display:flex;align-items:center;justify-content:space-between;padding-block:16px 10px}
+.side-top h1{margin:0;font-size:15px;font-weight:600;letter-spacing:.01em}
+.btn{font-size:13px;padding:6px 12px;border:1px solid var(--line);background:transparent;border-radius:4px;cursor:pointer;line-height:1.3}
+.btn:hover{background:var(--soft)}
+.btn.solid{background:var(--inv);color:var(--on-inv);border-color:var(--inv)}
+.btn.solid:hover{opacity:.88}
+.search input{width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--line);border-radius:4px;background:var(--bg);font-size:14px}
+.search input::placeholder{color:var(--muted)}
+
+.cal-head{display:flex;align-items:center;gap:2px;padding:16px 0 6px}
+.cal-head .lbl{flex:1;font-weight:600;font-size:13px}
+.icon-btn{width:28px;height:28px;display:inline-grid;place-items:center;border:0;background:transparent;border-radius:4px;cursor:pointer;flex:none}
+.icon-btn:hover{background:var(--soft)}
+.link-btn{border:0;background:transparent;padding:4px 6px;font:500 11px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);cursor:pointer;border-radius:4px}
+.link-btn:hover{color:var(--fg);background:var(--soft)}
+.cal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:2px}
+.wd{font:500 10px var(--mono);color:var(--muted);text-align:center;padding:4px 0;letter-spacing:.06em}
+.day{position:relative;height:34px;border:1px solid transparent;background:transparent;font:13px var(--mono);border-radius:4px;cursor:pointer;padding:0;font-variant-numeric:tabular-nums}
+.day:hover{background:var(--soft)}
+.day.today{border-color:var(--fg)}
+.day.sel{background:var(--inv);color:var(--on-inv)}
+.day.has::after{content:"";position:absolute;left:50%;bottom:4px;width:4px;height:4px;margin-left:-2px;border-radius:50%;background:currentColor}
+
+.list-head{display:flex;justify-content:space-between;align-items:center;min-height:28px;margin-top:10px;font:500 11px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.list{list-style:none;margin:0;padding:0 0 16px;overflow:auto;flex:1;min-height:0}
+.item{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:1px 10px;width:100%;text-align:left;padding:9px 10px;margin:0 0 1px;border:0;border-radius:4px;background:transparent;cursor:pointer}
+.item:hover{background:var(--soft)}
+.item[aria-current="true"]{background:var(--soft)}
+.item .t{font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.item .s{grid-column:1;color:var(--muted);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.item .d{grid-row:1;grid-column:2;font:11px var(--mono);color:var(--muted);align-self:center}
+.none{padding:14px 2px;color:var(--muted);font-size:13px}
+
+/* editor */
+.editor{display:flex;flex-direction:column;min-height:0;min-width:0;position:relative}
+.ed-top{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px var(--gr) 6px var(--gl)}
+.back{display:none;align-items:center;gap:4px}
+.tools-bar{position:relative;border-bottom:1px solid var(--line)}
+.tools{display:flex;align-items:center;gap:2px;overflow-x:auto;padding:4px var(--gr) 8px var(--gl);scrollbar-width:none}
+.tools::-webkit-scrollbar{display:none}
+.tb{flex:none;height:30px;min-width:30px;padding:0 9px;border:1px solid transparent;background:transparent;border-radius:4px;font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap}
+.tb:hover{background:var(--soft)}
+.tb:disabled{opacity:.35;cursor:default;background:transparent}
+.tb.i{font-style:italic;font-family:Georgia,serif;font-size:15px}
+.sep{flex:none;width:1px;height:18px;background:var(--line);margin:0 6px}
+.pop{position:absolute;top:calc(100% + 4px);left:var(--gl);z-index:5;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:12px;display:flex;gap:12px;align-items:flex-end;box-shadow:0 8px 28px rgb(0 0 0 / .14)}
+.pop label{display:flex;flex-direction:column;gap:4px;font:500 11px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.pop input{width:64px;padding:6px 8px;border:1px solid var(--line);border-radius:4px;background:transparent;font:14px var(--mono)}
+
+.ed-scroll{flex:1;min-height:0;overflow:auto;padding-inline:var(--gl) var(--gr)}
+.ed-inner{max-width:760px;margin:0 auto;padding:26px 0 72px;min-width:0}
+.title{display:block;width:100%;box-sizing:border-box;border:0;outline:0;background:transparent;font:600 28px/1.25 var(--ui);padding:0;margin:0 0 10px;letter-spacing:-.01em}
+.title::placeholder{color:var(--muted);opacity:.7}
+.meta{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:20px;font:12px var(--mono);color:var(--muted)}
+.meta input{font:12px var(--mono);padding:3px 6px;border:1px solid var(--line);border-radius:4px;background:transparent}
+.body{outline:0;font-size:16px;line-height:1.65;min-height:40vh;overflow-wrap:anywhere}
+.body:empty::before{content:attr(data-ph);color:var(--muted)}
+.body p,.body div{margin:0 0 .6em}
+.body h2{font-size:20px;margin:1em 0 .4em;line-height:1.3}
+.body ul,.body ol{margin:0 0 .8em;padding-left:1.4em}
+.body table{border-collapse:collapse;width:100%;margin:14px 0}
+.body th,.body td{border:1px solid var(--line);padding:8px 10px;min-width:92px;text-align:left;vertical-align:top;font-size:15px;line-height:1.45}
+.body td>div,.body th>div,.body td>p,.body th>p{margin:0}
+.body th{background:var(--side);font-weight:600;font-size:12px;letter-spacing:.04em;text-transform:uppercase}
+.ed-foot{display:flex;justify-content:space-between;gap:12px;padding:8px var(--gr) 8px var(--gl);border-top:1px solid var(--line);font:11px var(--mono);color:var(--muted)}
+.empty{display:none;flex:1;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:var(--muted);padding:24px var(--gr) 24px var(--gl);text-align:center}
+.editor.is-empty>:not(.empty){display:none}
+.editor.is-empty>.empty{display:flex}
+
+@media (max-width:720px){
+  .app{grid-template-columns:minmax(0,1fr)}
+  .app[data-view="list"] .editor{display:none}
+  .app[data-view="editor"] .side{display:none}
+  .back{display:inline-flex}
+  .side{overflow-y:auto}
+  .list{overflow:visible;flex:none}
+  .title{font-size:24px}
+}
+</style>
+
+<div class="app" id="app" data-view="list">
+  <aside class="side">
+    <header class="side-top">
+      <h1>Notes</h1>
+      <button class="btn solid" id="newBtn" type="button">New note</button>
+    </header>
+    <div class="search"><input id="q" type="search" placeholder="Search notes" aria-label="Search notes" autocomplete="off"></div>
+
+    <div class="cal-head">
+      <span class="lbl" id="calLabel"></span>
+      <button class="icon-btn" id="calPrev" type="button" aria-label="Previous month"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M10 3L5 8l5 5"/></svg></button>
+      <button class="icon-btn" id="calNext" type="button" aria-label="Next month"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 3l5 5-5 5"/></svg></button>
+      <button class="link-btn" id="calToday" type="button">Today</button>
+      <button class="link-btn" id="calToggle" type="button" aria-expanded="true">Hide</button>
+    </div>
+    <div class="cal-grid" id="calGrid" role="group" aria-label="Calendar"></div>
+
+    <div class="list-head"><span id="listTitle"></span><button class="link-btn" id="clearFilter" type="button" hidden>Show all</button></div>
+    <ul class="list" id="list"></ul>
+  </aside>
+
+  <main class="editor is-empty" id="editor">
+    <div class="ed-top">
+      <button class="btn back" id="backBtn" type="button"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M10 3L5 8l5 5"/></svg>Notes</button>
+      <span></span>
+      <button class="btn" id="delBtn" type="button">Delete</button>
+    </div>
+    <div class="tools-bar" id="toolsBar">
+      <div class="tools" id="tools">
+        <button class="tb" type="button" data-cmd="bold" title="Bold" aria-label="Bold"><b>B</b></button>
+        <button class="tb i" type="button" data-cmd="italic" title="Italic" aria-label="Italic">I</button>
+        <button class="tb" type="button" data-cmd="heading" title="Heading" aria-label="Heading">Heading</button>
+        <button class="tb" type="button" data-cmd="list" title="Bulleted list" aria-label="Bulleted list">List</button>
+        <span class="sep"></span>
+        <button class="tb" type="button" id="tblBtn" aria-haspopup="true" aria-expanded="false">Table</button>
+        <button class="tb" type="button" data-act="addRow" disabled>+ Row</button>
+        <button class="tb" type="button" data-act="addCol" disabled>+ Col</button>
+        <button class="tb" type="button" data-act="delRow" disabled>&minus; Row</button>
+        <button class="tb" type="button" data-act="delCol" disabled>&minus; Col</button>
+        <button class="tb" type="button" data-act="delTable" disabled>Remove table</button>
+      </div>
+      <div class="pop" id="tblPop" hidden>
+        <label>Rows<input id="tblRows" type="number" min="2" max="20" value="3" inputmode="numeric"></label>
+        <label>Columns<input id="tblCols" type="number" min="1" max="8" value="3" inputmode="numeric"></label>
+        <button class="btn solid" id="tblGo" type="button">Insert</button>
+      </div>
+    </div>
+    <div class="ed-scroll" id="edScroll">
+      <div class="ed-inner">
+        <input class="title" id="title" type="text" placeholder="Untitled" aria-label="Title" autocomplete="off">
+        <div class="meta"><label for="date">Date</label><input type="date" id="date"><span id="meta"></span></div>
+        <div class="body" id="body" contenteditable="true" spellcheck="true" role="textbox" aria-multiline="true" aria-label="Note" data-ph="Start writing"></div>
+      </div>
+    </div>
+    <div class="ed-foot"><span id="count"></span><span id="status"></span></div>
+    <div class="empty"><div>No note open.</div><button class="btn solid" id="emptyNew" type="button">New note</button></div>
+  </main>
+</div>
+
+<script>
+(function(){
+'use strict';
+var $=function(s){return document.querySelector(s);};
+var LS='plainnotes.v1', LSU='plainnotes.ui';
+var app=$('#app'),editor=$('#editor'),q=$('#q'),listEl=$('#list'),listTitle=$('#listTitle'),clearFilter=$('#clearFilter'),
+    calGrid=$('#calGrid'),calLabel=$('#calLabel'),titleEl=$('#title'),dateEl=$('#date'),bodyEl=$('#body'),
+    metaEl=$('#meta'),countEl=$('#count'),statusEl=$('#status'),tools=$('#tools'),pop=$('#tblPop'),tblBtn=$('#tblBtn'),
+    delBtn=$('#delBtn');
+var tblActs=[].slice.call(document.querySelectorAll('[data-act]'));
+
+var notes=[],curId=null,filterDate='',query='',lastCell=null,savedRange=null,delArmed=0;
+var col=null,synced=false,pending=new Set(),timers={},queues={};
+var now=new Date(),cal={y:now.getFullYear(),m:now.getMonth()};
+
+function pad(n){return String(n).padStart(2,'0');}
+function ymd(d){return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());}
+function todayStr(){return ymd(new Date());}
+function newId(){return 'n'+Date.now().toString(36)+Math.random().toString(36).slice(2,7);}
+function parseYmd(s){var p=s.split('-');return new Date(+p[0],+p[1]-1,+p[2]);}
+function fmtDay(s){return new Intl.DateTimeFormat('en-GB',{weekday:'short',day:'numeric',month:'short'}).format(parseYmd(s));}
+function fmtShort(s){return new Intl.DateTimeFormat('en-GB',{day:'numeric',month:'short'}).format(parseYmd(s));}
+function fmtEdited(t){return new Intl.DateTimeFormat('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}).format(new Date(t));}
+
+/* ---------- sanitizer ---------- */
+var ALLOW={P:1,DIV:1,BR:1,B:1,STRONG:1,I:1,EM:1,U:1,UL:1,OL:1,LI:1,TABLE:1,THEAD:1,TBODY:1,TR:1,TD:1,TH:1,H1:1,H2:1,H3:1,BLOCKQUOTE:1};
+var SKIP={SCRIPT:1,STYLE:1,IFRAME:1,OBJECT:1,EMBED:1,LINK:1,META:1,TEMPLATE:1,NOSCRIPT:1,SVG:1,IMG:1,VIDEO:1,AUDIO:1,CANVAS:1,FORM:1,INPUT:1,BUTTON:1,SELECT:1,TEXTAREA:1,HEAD:1};
+function clean(html){
+  var doc=new DOMParser().parseFromString('<body>'+html+'</body>','text/html');
+  var out=document.createElement('div');
+  (function walk(src,dst){
+    src.childNodes.forEach(function(n){
+      if(n.nodeType===3){dst.appendChild(document.createTextNode(n.nodeValue));return;}
+      if(n.nodeType!==1)return;
+      var t=n.tagName.toUpperCase();
+      if(SKIP[t])return;
+      if(ALLOW[t]){
+        var e=document.createElement(t.toLowerCase());
+        if(t==='TD'||t==='TH'){['colspan','rowspan'].forEach(function(a){var v=parseInt(n.getAttribute(a)||'',10);if(v>1&&v<50)e.setAttribute(a,v);});}
+        walk(n,e);dst.appendChild(e);
+      }else walk(n,dst);
+    });
+  })(doc.body,out);
+  return out.innerHTML;
+}
+function norm(n){
+  return {id:String(n.id),title:String(n.title||''),html:clean(String(n.html||'')),
+    date:/^\d{4}-\d{2}-\d{2}$/.test(n.date||'')?n.date:'',updated:Number(n.updated)||Date.now()};
+}
+function textOf(n){
+  if(n._x&&n._x.u===n.updated)return n._x.t;
+  var d=document.createElement('div');
+  d.innerHTML=n.html.replace(/<\/(p|div|li|tr|td|th|h[1-3])>|<br\s*\/?>/gi,' ');
+  var t=(d.textContent||'').replace(/\s+/g,' ').trim();
+  n._x={u:n.updated,t:t};return t;
+}
+function isEmptyNote(n){return !n.title.trim()&&!textOf(n)&&!/<table/i.test(n.html);}
+
+/* ---------- local copy ---------- */
+function loadLocal(){
+  try{var a=JSON.parse(localStorage.getItem(LS)||'[]');return Array.isArray(a)?a.filter(function(n){return n&&n.id;}).map(norm):[];}catch(e){return [];}
+}
+function saveLocal(){
+  try{localStorage.setItem(LS,JSON.stringify(notes.map(function(n){return {id:n.id,title:n.title,html:n.html,date:n.date,updated:n.updated};})));}catch(e){}
+}
+
+/* ---------- sync ---------- */
+function updateStatus(){
+  statusEl.textContent=!col?'Saved on this device':(pending.size?'Saving…':'Saved');
+}
+function mark(id){
+  pending.add(id);updateStatus();
+  clearTimeout(timers[id]);
+  timers[id]=setTimeout(function(){flush(id);},600);
+}
+function flush(id){
+  clearTimeout(timers[id]);delete timers[id];
+  if(!col){pending.delete(id);updateStatus();return;}
+  queues[id]=(queues[id]||Promise.resolve()).then(function(){
+    var m=notes.find(function(x){return x.id===id;});
+    if(!m||!col)return;
+    return col.doc(id).set({title:m.title,html:m.html,date:m.date,updated:m.updated});
+  }).then(function(){
+    if(!timers[id])pending.delete(id);
+    updateStatus();
+  }).catch(function(e){
+    if(!timers[id])pending.delete(id);
+    statusEl.textContent=(e&&e.code==='quota_exceeded')?'Storage full':'Saved on this device only';
+  });
+}
+function flushAll(){Object.keys(timers).forEach(flush);}
+function removeRemote(id){
+  pending.delete(id);clearTimeout(timers[id]);delete timers[id];
+  if(col){queues[id]=(queues[id]||Promise.resolve()).then(function(){return col.doc(id).delete();}).catch(function(){});}
+}
+function onRemote(snap){
+  var remote=snap.docs.map(function(d){var x=d.data()||{};return norm({id:d.id,title:x.title,html:x.html,date:x.date,updated:x.updated});});
+  var first=!synced;synced=true;
+  var rm={};remote.forEach(function(r){rm[r.id]=r;});
+  var next=[];
+  remote.forEach(function(r){
+    var l=notes.find(function(x){return x.id===r.id;});
+    if(l&&(pending.has(r.id)||l.updated>r.updated)){next.push(l);if(first&&!pending.has(r.id))mark(r.id);}
+    else next.push(r);
+  });
+  notes.forEach(function(l){
+    if(rm[l.id])return;
+    if(first||pending.has(l.id)){next.push(l);if(first)mark(l.id);}
+  });
+  notes=next;saveLocal();
+  if(curId&&!notes.some(function(n){return n.id===curId;}))curId=null;
+  ensureCur();
+  renderCal();renderList();
+  var ae=document.activeElement;
+  if(curId&&!pending.has(curId)&&ae!==bodyEl&&ae!==titleEl)fillEditor();
+  else if(!curId)fillEditor();
+}
+async function initStore(){
+  try{
+    if(window.claude&&claude.use){
+      var r=await Promise.all([claude.use('db'),claude.use('user')]);
+      var db=r[0],user=r[1];
+      var id=user?await user.id():null;
+      if(db&&id){
+        var c=db.doc('data/users/'+id+'/notebook').collection('notes');
+        col=c;
+        await new Promise(function(res){
+          var done=false;
+          c.onSnapshot(function(s){onRemote(s);if(!done){done=true;res();}},
+                       function(){col=null;updateStatus();if(!done){done=true;res();}});
+        });
+      }
+    }
+  }catch(e){col=null;}
+  if(!notes.length)createWelcome();
+  updateStatus();
+}
+function createWelcome(){
+  var n={id:newId(),title:'Welcome',date:todayStr(),updated:Date.now(),
+    html:'<p>A plain notepad. Everything saves as you type.</p>'+
+    '<p>Use Table in the toolbar to add a table. Tab moves between cells and adds a row from the last one. Give a note a date and it shows up on the calendar.</p>'+
+    '<table><thead><tr><th>Task</th><th>Due</th><th>Status</th></tr></thead><tbody><tr><td>Example row</td><td>Fri</td><td>Open</td></tr><tr><td><br></td><td><br></td><td><br></td></tr></tbody></table><p><br></p>'};
+  notes.unshift(n);saveLocal();mark(n.id);flush(n.id);
+  curId=n.id;fillEditor();renderCal();renderList();
+}
+
+/* ---------- state helpers ---------- */
+function cur(){return notes.find(function(n){return n.id===curId;})||null;}
+function sorted(){return notes.slice().sort(function(a,b){return b.updated-a.updated;});}
+function ensureCur(){
+  if(curId&&cur())return;
+  var s=sorted();curId=s.length?s[0].id:null;
+}
+function visible(){
+  var ql=query.trim().toLowerCase();
+  return sorted().filter(function(n){
+    if(filterDate&&n.date!==filterDate)return false;
+    if(ql&&(n.title.toLowerCase().indexOf(ql)<0&&textOf(n).toLowerCase().indexOf(ql)<0))return false;
+    return true;
+  });
+}
+
+/* ---------- rendering ---------- */
+function renderCal(){
+  var y=cal.y,m=cal.m,first=new Date(y,m,1),lead=(first.getDay()+6)%7,days=new Date(y,m+1,0).getDate();
+  var counts={};notes.forEach(function(n){if(n.date)counts[n.date]=(counts[n.date]||0)+1;});
+  calLabel.textContent=new Intl.DateTimeFormat('en-GB',{month:'long',year:'numeric'}).format(first);
+  calGrid.textContent='';
+  ['M','T','W','T','F','S','S'].forEach(function(w){var s=document.createElement('span');s.className='wd';s.setAttribute('aria-hidden','true');s.textContent=w;calGrid.appendChild(s);});
+  for(var i=0;i<lead;i++)calGrid.appendChild(document.createElement('span'));
+  var t=todayStr();
+  for(var d=1;d<=days;d++){
+    var s=y+'-'+pad(m+1)+'-'+pad(d),b=document.createElement('button');
+    b.type='button';b.className='day'+(s===t?' today':'')+(s===filterDate?' sel':'')+(counts[s]?' has':'');
+    b.dataset.d=s;b.textContent=d;
+    b.setAttribute('aria-pressed',s===filterDate?'true':'false');
+    b.setAttribute('aria-label',fmtDay(s)+(counts[s]?', '+counts[s]+(counts[s]===1?' note':' notes'):''));
+    calGrid.appendChild(b);
+  }
+}
+function renderList(){
+  var v=visible();
+  if(filterDate){listTitle.textContent=fmtDay(filterDate)+' · '+v.length+(v.length===1?' note':' notes');}
+  else if(query.trim()){listTitle.textContent=v.length+(v.length===1?' result':' results');}
+  else{listTitle.textContent='All notes · '+notes.length;}
+  clearFilter.hidden=!filterDate;
+  listEl.textContent='';
+  if(!v.length){
+    var li=document.createElement('li');li.className='none';
+    li.textContent=filterDate?'No notes on this day.':(query.trim()?'No matches.':'No notes yet.');
+    listEl.appendChild(li);return;
+  }
+  v.forEach(function(n){
+    var li=document.createElement('li'),b=document.createElement('button');
+    b.type='button';b.className='item';b.dataset.id=n.id;
+    if(n.id===curId)b.setAttribute('aria-current','true');
+    var t=document.createElement('span');t.className='t';t.textContent=n.title.trim()||'Untitled';
+    var s=document.createElement('span');s.className='s';s.textContent=textOf(n).slice(0,90)||'Empty note';
+    b.appendChild(t);
+    if(n.date){var d=document.createElement('span');d.className='d';d.textContent=fmtShort(n.date);b.appendChild(d);}
+    b.appendChild(s);li.appendChild(b);listEl.appendChild(li);
+  });
+}
+function fillEditor(){
+  var n=cur();
+  editor.classList.toggle('is-empty',!n);
+  if(!n){app.dataset.view==='editor'&&window.matchMedia('(max-width:720px)').matches&&(app.dataset.view='list');return;}
+  titleEl.value=n.title;dateEl.value=n.date;
+  if(bodyEl.innerHTML!==n.html)bodyEl.innerHTML=n.html;
+  lastCell=null;syncTools();updateMeta();updateCount();
+}
+function updateMeta(){var n=cur();metaEl.textContent=n?'Edited '+fmtEdited(n.updated):'';}
+function updateCount(){
+  var txt=(bodyEl.innerText||'').trim(),w=txt?txt.split(/\s+/).length:0,t=bodyEl.querySelectorAll('table').length;
+  countEl.textContent=w+(w===1?' word':' words')+(t?' · '+t+(t===1?' table':' tables'):'');
+}
+
+/* ---------- editing ---------- */
+function touch(){
+  var n=cur();if(!n)return;
+  var lc=bodyEl.lastElementChild;
+  if(lc&&lc.tagName==='TABLE'){var p=document.createElement('p');p.appendChild(document.createElement('br'));bodyEl.appendChild(p);}
+  if(!(bodyEl.textContent||'').trim()&&!bodyEl.querySelector('table,li')&&bodyEl.innerHTML!=='')bodyEl.innerHTML='';
+  n.title=titleEl.value;n.html=bodyEl.innerHTML;n.date=dateEl.value;n.updated=Date.now();n._x=null;
+  saveLocal();mark(n.id);renderList();renderCal();updateMeta();updateCount();
+}
+function openNote(id){
+  if(curId&&curId!==id){flushNow(curId);dropIfEmpty(curId);}
+  curId=id;fillEditor();renderList();renderCal();app.dataset.view='editor';
+}
+function flushNow(id){if(timers[id])flush(id);}
+function dropIfEmpty(id){
+  var n=notes.find(function(x){return x.id===id;});
+  if(n&&isEmptyNote(n)){notes=notes.filter(function(x){return x.id!==id;});saveLocal();removeRemote(id);}
+}
+function newNote(){
+  var c=cur();
+  if(c&&isEmptyNote(c)){app.dataset.view='editor';titleEl.focus();return;}
+  if(curId){flushNow(curId);dropIfEmpty(curId);}
+  var n={id:newId(),title:'',html:'',date:filterDate||'',updated:Date.now()};
+  notes.unshift(n);curId=n.id;saveLocal();mark(n.id);
+  fillEditor();renderList();renderCal();app.dataset.view='editor';titleEl.focus();
+}
+function deleteNote(){
+  var n=cur();if(!n)return;
+  notes=notes.filter(function(x){return x.id!==n.id;});saveLocal();removeRemote(n.id);
+  curId=null;ensureCur();
+  fillEditor();renderList();renderCal();
+  if(!curId)app.dataset.view='list';
+}
+
+/* ---------- toolbar ---------- */
+function fmt(cmd,val){bodyEl.focus();document.execCommand(cmd,false,val||null);touch();}
+tools.addEventListener('mousedown',function(e){if(e.target.closest('button'))e.preventDefault();});
+tools.addEventListener('click',function(e){
+  var b=e.target.closest('button');if(!b)return;
+  if(b.dataset.cmd){
+    var c=b.dataset.cmd;
+    if(c==='bold')fmt('bold');
+    else if(c==='italic')fmt('italic');
+    else if(c==='list')fmt('insertUnorderedList');
+    else if(c==='heading'){var v=(document.queryCommandValue('formatBlock')||'').toLowerCase();fmt('formatBlock',v==='h2'?'p':'h2');}
+  }else if(b.dataset.act){tableAct(b.dataset.act);}
+});
+
+/* ---------- tables ---------- */
+function tableHTML(r,c){
+  var h='<table><thead><tr>'+new Array(c+1).join('<th><br></th>')+'</tr></thead><tbody>';
+  for(var i=1;i<r;i++)h+='<tr>'+new Array(c+1).join('<td><br></td>')+'</tr>';
+  return h+'</tbody></table><p><br></p>';
+}
+function clamp(v,a,b){v=parseInt(v,10);if(isNaN(v))v=a;return Math.max(a,Math.min(b,v));}
+function saveRange(){
+  var s=getSelection();
+  if(s.rangeCount){var r=s.getRangeAt(0);if(bodyEl.contains(r.commonAncestorContainer))savedRange=r.cloneRange();}
+}
+function closePop(){pop.hidden=true;tblBtn.setAttribute('aria-expanded','false');}
+tblBtn.addEventListener('click',function(){
+  if(!pop.hidden){closePop();return;}
+  saveRange();pop.hidden=false;tblBtn.setAttribute('aria-expanded','true');
+  $('#tblRows').focus();$('#tblRows').select();
+});
+function insertTable(){
+  var r=clamp($('#tblRows').value,2,20),c=clamp($('#tblCols').value,1,8);
+  bodyEl.focus();
+  var s=getSelection();
+  if(savedRange){s.removeAllRanges();s.addRange(savedRange);}
+  else{var rg=document.createRange();rg.selectNodeContents(bodyEl);rg.collapse(false);s.removeAllRanges();s.addRange(rg);}
+  var before=new Set(bodyEl.querySelectorAll('table'));
+  document.execCommand('insertHTML',false,tableHTML(r,c));
+  var t=[].slice.call(bodyEl.querySelectorAll('table')).find(function(x){return !before.has(x);});
+  closePop();savedRange=null;
+  if(t&&t.rows[0])focusCell(t.rows[0].cells[0]);
+  touch();
+}
+$('#tblGo').addEventListener('click',insertTable);
+pop.addEventListener('keydown',function(e){
+  if(e.key==='Enter'){e.preventDefault();insertTable();}
+  if(e.key==='Escape'){closePop();bodyEl.focus();}
+});
+document.addEventListener('mousedown',function(e){
+  if(!pop.hidden&&!pop.contains(e.target)&&!tblBtn.contains(e.target))closePop();
+});
+function cellOf(n){if(n&&n.nodeType===3)n=n.parentNode;return n&&n.closest?n.closest('td,th'):null;}
+function focusCell(c){
+  if(!c)return;
+  bodyEl.focus({preventScroll:true});
+  var r=document.createRange();r.selectNodeContents(c);r.collapse(true);
+  var s=getSelection();s.removeAllRanges();s.addRange(r);
+  lastCell=c;syncTools();
+  if(c.scrollIntoView)c.scrollIntoView({block:'nearest',inline:'nearest'});
+}
+function syncTools(){
+  var on=!!(lastCell&&lastCell.isConnected&&bodyEl.contains(lastCell));
+  tblActs.forEach(function(b){b.disabled=!on;});
+}
+document.addEventListener('selectionchange',function(){
+  var s=getSelection();if(!s||!s.rangeCount)return;
+  var n=s.anchorNode;if(n&&n.nodeType===3)n=n.parentNode;
+  if(!n||!bodyEl.contains(n))return;
+  lastCell=cellOf(n);syncTools();
+});
+function mk(tag){var e=document.createElement(tag);e.appendChild(document.createElement('br'));return e;}
+function addRow(from){
+  var c=from||lastCell;if(!c)return null;
+  var tr=c.parentNode,cols=tr.cells.length,nr=document.createElement('tr');
+  for(var i=0;i<cols;i++)nr.appendChild(mk('td'));
+  if(tr.parentNode.tagName==='THEAD'){
+    var t=c.closest('table'),tb=t.tBodies[0];
+    if(!tb){tb=document.createElement('tbody');t.appendChild(tb);}
+    tb.insertBefore(nr,tb.firstChild);
+  }else tr.after(nr);
+  return nr;
+}
+function tableAct(a){
+  var c=lastCell;if(!c||!c.isConnected)return;
+  var t=c.closest('table'),tr=c.parentNode,idx=c.cellIndex;
+  if(a==='addRow'){var nr=addRow(c);if(nr)focusCell(nr.cells[Math.min(idx,nr.cells.length-1)]);}
+  else if(a==='addCol'){
+    [].slice.call(t.rows).forEach(function(r){
+      var nc=mk(r.parentNode.tagName==='THEAD'?'th':'td'),ref=r.cells[idx];
+      if(ref)ref.after(nc);else r.appendChild(nc);
+    });
+    focusCell(c.nextElementSibling||c);
+  }else if(a==='delRow'){
+    if(t.rows.length<=1){delTable(t);}
+    else{
+      var nb=tr.nextElementSibling||tr.previousElementSibling||(tr.parentNode.nextElementSibling&&tr.parentNode.nextElementSibling.rows[0])||(tr.parentNode.previousElementSibling&&tr.parentNode.previousElementSibling.rows[0]);
+      var par=tr.parentNode;tr.remove();
+      if(par.tagName!=='THEAD'&&!par.rows.length)par.remove();
+      if(nb&&nb.isConnected)focusCell(nb.cells[Math.min(idx,nb.cells.length-1)]);else lastCell=null;
+    }
+  }else if(a==='delCol'){
+    if(tr.cells.length<=1){delTable(t);}
+    else{
+      var keep=c.nextElementSibling||c.previousElementSibling;
+      [].slice.call(t.rows).forEach(function(r){if(r.cells[idx])r.cells[idx].remove();});
+      if(keep&&keep.isConnected)focusCell(keep);
+    }
+  }else if(a==='delTable'){delTable(t);}
+  syncTools();touch();
+}
+function delTable(t){t.remove();lastCell=null;}
+bodyEl.addEventListener('keydown',function(e){
+  if(e.key!=='Tab')return;
+  var s=getSelection(),c=s&&s.anchorNode?cellOf(s.anchorNode):null;
+  if(!c||!bodyEl.contains(c))return;
+  e.preventDefault();
+  var cells=[].slice.call(c.closest('table').querySelectorAll('th,td')),i=cells.indexOf(c),j=e.shiftKey?i-1:i+1;
+  if(j>=0&&j<cells.length)focusCell(cells[j]);
+  else if(!e.shiftKey){var nr=addRow(c);if(nr){focusCell(nr.cells[0]);touch();}}
+});
+bodyEl.addEventListener('paste',function(e){
+  e.preventDefault();
+  var cd=e.clipboardData;if(!cd)return;
+  var html=cd.getData('text/html'),txt=cd.getData('text/plain');
+  if(html&&/<table/i.test(html))document.execCommand('insertHTML',false,clean(html));
+  else document.execCommand('insertText',false,txt);
+  touch();
+});
+bodyEl.addEventListener('focus',function(){try{document.execCommand('defaultParagraphSeparator',false,'p');}catch(e){}});
+bodyEl.addEventListener('input',touch);
+titleEl.addEventListener('input',touch);
+titleEl.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();bodyEl.focus();}});
+dateEl.addEventListener('change',function(){
+  touch();
+  if(dateEl.value){var d=parseYmd(dateEl.value);cal={y:d.getFullYear(),m:d.getMonth()};renderCal();}
+});
+
+/* ---------- sidebar wiring ---------- */
+listEl.addEventListener('click',function(e){var b=e.target.closest('.item');if(b)openNote(b.dataset.id);});
+calGrid.addEventListener('click',function(e){
+  var b=e.target.closest('.day');if(!b)return;
+  filterDate=filterDate===b.dataset.d?'':b.dataset.d;
+  renderCal();renderList();
+});
+clearFilter.addEventListener('click',function(){filterDate='';renderCal();renderList();});
+$('#calPrev').addEventListener('click',function(){cal.m--;if(cal.m<0){cal.m=11;cal.y--;}renderCal();});
+$('#calNext').addEventListener('click',function(){cal.m++;if(cal.m>11){cal.m=0;cal.y++;}renderCal();});
+$('#calToday').addEventListener('click',function(){var d=new Date();cal={y:d.getFullYear(),m:d.getMonth()};filterDate=todayStr();renderCal();renderList();});
+$('#calToggle').addEventListener('click',function(){setCalOpen(calGrid.hidden);});
+function setCalOpen(open){
+  calGrid.hidden=!open;$('#calToggle').textContent=open?'Hide':'Show';$('#calToggle').setAttribute('aria-expanded',String(open));
+  try{localStorage.setItem(LSU,JSON.stringify({cal:open}));}catch(e){}
+}
+q.addEventListener('input',function(){query=q.value;renderList();});
+$('#newBtn').addEventListener('click',newNote);
+$('#emptyNew').addEventListener('click',newNote);
+$('#backBtn').addEventListener('click',function(){
+  if(curId){flushNow(curId);dropIfEmpty(curId);ensureCur();fillEditor();renderList();renderCal();}
+  app.dataset.view='list';
+});
+delBtn.addEventListener('click',function(){
+  if(Date.now()-delArmed<3000){delArmed=0;delBtn.textContent='Delete';deleteNote();return;}
+  delArmed=Date.now();delBtn.textContent='Confirm delete';
+  setTimeout(function(){if(delArmed&&Date.now()-delArmed>=2900){delArmed=0;delBtn.textContent='Delete';}},3000);
+});
+document.addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden')flushAll();});
+window.addEventListener('pagehide',flushAll);
+
+/* ---------- boot ---------- */
+try{var ui=JSON.parse(localStorage.getItem(LSU)||'{}');if(ui&&ui.cal===false)setCalOpen(false);}catch(e){}
+notes=loadLocal();
+ensureCur();
+renderCal();renderList();fillEditor();updateStatus();
+initStore();
+})();
+</script>
+
+</body></html>
